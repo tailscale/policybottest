@@ -1,0 +1,142 @@
+# Tests for testdata/tailscale.com.policy.yml.
+#
+# Run from the parent directory with:
+#   go run . -policy testdata/tailscale.com.policy.yml \
+#            -tests  testdata/tailscale.com.policy-test.yml
+
+teams:
+  # Members are picked solely so tests below can refer to them.
+  tailscale/control-protocol-owners:
+    - alice
+    - bob
+  tailscale/dev:
+    - alice
+    - bob
+    - carol
+    - dave
+    - eve
+
+tests:
+  # ---- non-tailcfg path ----
+  - name: non-tailcfg change skips all rules
+    pull_request:
+      author: carol
+      changed_files:
+        - README.md
+        - cmd/tailscale/main.go
+    expect:
+      status: skipped
+      rules:
+        "tailcfg changes approved by control-protocol-owners": skipped
+        "tailcfg changes overridden by another tailscale/dev": skipped
+
+  # ---- tailcfg path: no signoff ----
+  - name: tailcfg change without approval is pending
+    pull_request:
+      author: carol
+      changed_files:
+        - tailcfg/tailcfg.go
+    expect:
+      status: pending
+      rules:
+        "tailcfg changes approved by control-protocol-owners": pending
+        "tailcfg changes overridden by another tailscale/dev": pending
+
+  # ---- tailcfg path: normal control-protocol-owners review ----
+  - name: control-protocol-owners review approves
+    pull_request:
+      author: carol
+      changed_files:
+        - tailcfg/tailcfg.go
+      reviews:
+        - user: alice
+          state: approved
+    expect:
+      status: approved
+      rules:
+        "tailcfg changes approved by control-protocol-owners": approved
+
+  - name: control-protocol-owners author cannot self-approve
+    pull_request:
+      author: alice
+      changed_files:
+        - tailcfg/tailcfg.go
+      reviews:
+        - user: alice
+          state: approved
+    expect:
+      status: pending
+      rules:
+        "tailcfg changes approved by control-protocol-owners": pending
+
+  - name: non-owner review does not satisfy the owners rule
+    pull_request:
+      author: alice
+      changed_files:
+        - tailcfg/tailcfg.go
+      reviews:
+        - user: carol
+          state: approved
+    expect:
+      rules:
+        "tailcfg changes approved by control-protocol-owners": pending
+
+  # ---- tailcfg path: policybot-override comment ----
+  - name: policybot-override comment from another dev approves
+    pull_request:
+      author: carol
+      changed_files:
+        - tailcfg/tailcfg.go
+      comments:
+        - user: dave
+          body: "policybot-override: testing the override flow"
+    expect:
+      status: approved
+      rules:
+        "tailcfg changes overridden by another tailscale/dev": approved
+
+  - name: policybot-override comment from the author does not approve
+    pull_request:
+      author: carol
+      changed_files:
+        - tailcfg/tailcfg.go
+      comments:
+        - user: carol
+          body: "policybot-override: please let me ship this"
+    expect:
+      status: pending
+      rules:
+        "tailcfg changes overridden by another tailscale/dev": pending
+
+  - name: policybot-override comment from a non-dev does not approve
+    pull_request:
+      author: carol
+      changed_files:
+        - tailcfg/tailcfg.go
+      comments:
+        - user: outsider
+          body: "policybot-override: I am not on the dev team"
+    expect:
+      status: pending
+
+  - name: policybot-override with no reason does not approve
+    pull_request:
+      author: carol
+      changed_files:
+        - tailcfg/tailcfg.go
+      comments:
+        - user: dave
+          body: "policybot-override:"
+    expect:
+      status: pending
+
+  - name: a normal looking comment from a dev does not override
+    pull_request:
+      author: carol
+      changed_files:
+        - tailcfg/tailcfg.go
+      comments:
+        - user: dave
+          body: "looks good to me, ship it"
+    expect:
+      status: pending
