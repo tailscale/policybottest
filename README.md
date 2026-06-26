@@ -87,8 +87,8 @@ changed_files:
 ### `tests[].expect`
 
 Either assertion may be omitted; an empty `expect:` block is
-legal and asserts nothing (useful as a smoke test that the
-policy parses and runs against a given PR shape).
+legal and asserts nothing about per-rule behavior, but see the
+note on top-level `skipped` below.
 
 | Key      | Type                          | Notes                                                                 |
 | -------- | ----------------------------- | --------------------------------------------------------------------- |
@@ -99,6 +99,30 @@ When `rules` is set, the runner walks the policy-bot evaluation
 result tree and looks up each rule by its `Name`. A name that is
 not found in the tree fails the test and prints the list of
 names that *were* found, so typos are caught immediately.
+
+#### Top-level `skipped` is treated as failure
+
+The policy-bot evaluator's `Result.Status` has four values:
+`skipped`, `pending`, `approved`, `disapproved`. The server-side
+status-posting layer (`eval_context.go` in upstream) translates
+a top-level `skipped` result into a **failing** GitHub status
+check with the description "All rules were skipped. At least one
+rule must match." — this is something policy-bot fails the PR
+on, not a no-op.
+
+To make tests catch this rather than rubber-stamping it, the
+runner reports a top-level `skipped` result as a failure whenever
+`expect.status` is not set. If you genuinely want to assert that
+the top-level skipped state is intentional, opt in explicitly:
+
+```yaml
+expect:
+  status: skipped
+```
+
+Per-rule (child) `skipped` is never auto-failed, since "this rule
+didn't apply" is a normal evaluation outcome inside an `or` block
+or a path-gated rule.
 
 ### Enums
 

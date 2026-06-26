@@ -51,6 +51,17 @@ func Run(eval common.Evaluator, tc *TestConfig, out io.Writer) (failed int) {
 					"overall status: want %s, got %s (%s)",
 					want, result.Status, result.StatusDescription))
 			}
+		} else if result.Status == common.StatusSkipped {
+			// No explicit assertion, but the top-level result is
+			// Skipped, which policy-bot's status-posting layer
+			// translates into a failing GitHub status check with
+			// the description "All rules were skipped. At least
+			// one rule must match." (see policy-bot's
+			// server/handler/eval_context.go). Treat this as a
+			// failure so users notice the production behavior;
+			// callers who legitimately want this can opt in by
+			// asserting `expect.status: skipped` explicitly.
+			errs = append(errs, "overall status: top-level skipped — policy-bot will post this as a failing GitHub status check (\"All rules were skipped. At least one rule must match.\"); assert expect.status: skipped to opt in")
 		}
 		// Walk the result tree for any named rules the test checks.
 		// Build the index lazily so tests that don't use it skip the work.
