@@ -6,8 +6,12 @@
 
 teams:
   # Members are picked solely so tests below can refer to them.
-  # `alice` and `bob` are control-protocol-owners *and* dev. `carol`,
-  # `dave`, and `eve` are dev only. `outsider` is in nothing.
+  # `alice` and `bob` are control-protocol-owners *and* dev.
+  # `carol`, `dave`, and `eve` are dev only.
+  # `frank` is finance only.
+  # `carly-smith` is cs only (Customer Support and Success).
+  # `sybil-evans` is solutions-engineers only.
+  # `outsider` is in nothing.
   tailscale/control-protocol-owners:
     - alice
     - bob
@@ -17,11 +21,17 @@ teams:
     - carol
     - dave
     - eve
+  tailscale/finance:
+    - frank
+  tailscale/cs:
+    - carly-smith
+  tailscale/solutions-engineers:
+    - sybil-evans
 
 tests:
   # ------------------------------------------------------------------
   # Baseline: every PR (touching tailcfg/ or not) requires a +1 from a
-  # tailscale/dev member.
+  # tailscale/dev, tailscale/cs, or tailscale/solutions-engineers member.
   # ------------------------------------------------------------------
 
   - name: non-tailcfg PR with no review is pending
@@ -35,7 +45,7 @@ tests:
       rules:
         "tailcfg changes approved by control-protocol-owners": skipped
         "tailcfg changes overridden by another tailscale/dev": skipped
-        "any tailscale/dev review": pending
+        "any technical review": pending
 
   - name: non-tailcfg PR with dev review is approved
     pull_request:
@@ -48,7 +58,7 @@ tests:
     expect:
       status: approved
       rules:
-        "any tailscale/dev review": approved
+        "any technical review": approved
 
   - name: non-tailcfg PR with thumbs-up comment from dev is approved
     pull_request:
@@ -61,7 +71,46 @@ tests:
     expect:
       status: approved
       rules:
-        "any tailscale/dev review": approved
+        "any technical review": approved
+
+  - name: non-tailcfg PR with cs review is approved
+    pull_request:
+      author: carol
+      changed_files:
+        - README.md
+      reviews:
+        - user: carly-smith
+          state: approved
+    expect:
+      status: approved
+      rules:
+        "any technical review": approved
+
+  - name: non-tailcfg PR with solutions-engineers review is approved
+    pull_request:
+      author: carol
+      changed_files:
+        - README.md
+      reviews:
+        - user: sybil-evans
+          state: approved
+    expect:
+      status: approved
+      rules:
+        "any technical review": approved
+
+  - name: non-tailcfg PR with review from a non-tech team is pending
+    pull_request:
+      author: carol
+      changed_files:
+        - README.md
+      reviews:
+        - user: frank
+          state: approved
+    expect:
+      status: pending
+      rules:
+        "any technical review": pending
 
   - name: non-tailcfg PR with non-dev review is pending
     pull_request:
@@ -74,7 +123,7 @@ tests:
     expect:
       status: pending
       rules:
-        "any tailscale/dev review": pending
+        "any technical review": pending
 
   - name: PR with no files at all is pending without a dev review
     pull_request:
@@ -83,7 +132,7 @@ tests:
     expect:
       status: pending
       rules:
-        "any tailscale/dev review": pending
+        "any technical review": pending
 
   # ------------------------------------------------------------------
   # tailcfg/ requires BOTH a control-protocol-owners review (or an
@@ -101,7 +150,7 @@ tests:
       rules:
         "tailcfg changes approved by control-protocol-owners": pending
         "tailcfg changes overridden by another tailscale/dev": pending
-        "any tailscale/dev review": pending
+        "any technical review": pending
 
   - name: a single owner review approves both the owner rule and the dev rule
     pull_request:
@@ -115,7 +164,7 @@ tests:
       status: approved
       rules:
         "tailcfg changes approved by control-protocol-owners": approved
-        "any tailscale/dev review": approved
+        "any technical review": approved
 
   - name: owner cannot self-approve their own tailcfg PR
     pull_request:
@@ -141,7 +190,7 @@ tests:
       rules:
         "tailcfg changes approved by control-protocol-owners": pending
         "tailcfg changes overridden by another tailscale/dev": pending
-        "any tailscale/dev review": approved
+        "any technical review": approved
 
   # ------------------------------------------------------------------
   # policybot-override flow on a tailcfg/ PR.
@@ -161,7 +210,7 @@ tests:
       status: pending
       rules:
         "tailcfg changes overridden by another tailscale/dev": approved
-        "any tailscale/dev review": pending
+        "any technical review": pending
 
   - name: override comment plus a separate dev review approves
     pull_request:
